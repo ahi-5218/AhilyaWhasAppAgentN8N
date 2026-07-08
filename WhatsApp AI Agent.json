@@ -1,0 +1,206 @@
+{
+  "name": "WhatsApp AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "=whatsapp",
+        "authentication": "basicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7305e4a2-6a6c-4f12-b1fd-d76bdbc44422",
+      "name": "Webhook",
+      "webhookId": "84dbfd13-7a6d-410b-a2e5-d2ea1f4587cf",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "OyIsPbiyxfRQLAdh",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\n\nreturn [\n  {\n    json: {\n      message: item.json.body.Body,\n      from: item.json.body.From\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "87dd7dc3-dce5-4e9c-91e4-07a871beafba",
+      "name": "Extract User Response"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$json.message}}\n",
+        "options": {
+          "systemMessage": "You are a helpful WhatsApp AI assistant.\n\nAnswer politely.\n\nKeep responses concise.\n\nIf you don't know the answer, say you don't know."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "5ecf847a-029a-48d3-be0e-24783d89dfc5",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        288,
+        208
+      ],
+      "id": "19260f39-be58-4a19-87cb-b064bdabfc41",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "g2f3h07HpCdn5h3H",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\n\n// AI Agent output (works for current AI Agent node)\nconst reply =\n  item.json.output ||\n  item.json.response ||\n  item.json.text ||\n  \"\";\n\nreturn [\n  {\n    json: {\n      reply: reply.substring(0, 1600),\n      from: $('Extract User Response').first().json.from,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "282183e3-bca9-42a4-8197-9e1423d71f7f",
+      "name": "Shorten Response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/ACfb4a3b9bc9fc9a855b51219a79d20599/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "whatsapp:+14155238886"
+            },
+            {
+              "name": "To",
+              "value": "={{$json.from}}\n"
+            },
+            {
+              "name": "Body",
+              "value": "={{$json.reply}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        976,
+        0
+      ],
+      "id": "10648b07-3b53-4367-bf5f-311ceba50375",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "OyIsPbiyxfRQLAdh",
+          "name": "Unnamed credential"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract User Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract User Response": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Shorten Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shorten Response": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "fdfad393-6225-4c33-964b-73306d7eacd8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4000f33c5eccfa440a108d186d3c31ca8c08d0f58913ec51c2f0574fcb82486c"
+  },
+  "nodeGroups": [],
+  "id": "2VvjTldgRgEeuW9L",
+  "tags": []
+}
